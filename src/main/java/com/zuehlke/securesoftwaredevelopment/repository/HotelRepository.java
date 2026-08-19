@@ -133,17 +133,24 @@ public class HotelRepository {
         return id;
     }
 
-    public List<Hotel> search(String searchTerm) throws SQLException {
+    public List<Hotel> search(String searchTerm, String sortBy) throws SQLException {
         List<Hotel> destinationList = new ArrayList<>();
-        String query = "SELECT DISTINCT h.id, h.cityId, h.name, c.name, h.description, h.address FROM hotel h, city c" +
+        String query = "SELECT DISTINCT h.id, h.cityId, h.name AS \"name\", " +
+                "c.name AS \"cityName\", h.description, h.address FROM hotel h, city c" +
                 " WHERE h.cityId = c.id" +
-                " AND ((UPPER(h.name) like UPPER('%" + searchTerm + "%')" +
-                " OR UPPER(c.name) like UPPER('%" + searchTerm + "%')))";
+                " AND ((UPPER(h.name) like UPPER(?)" +
+                " OR UPPER(c.name) like UPPER(?)))" +
+                " ORDER BY \"" + sortBy + "\"";
         try (Connection connection = dataSource.getConnection();
-             Statement statement = connection.createStatement();
-             ResultSet rs = statement.executeQuery(query)) {
-            while (rs.next()) {
-                destinationList.add(crateHotelFromResultSet(rs));
+             PreparedStatement statement = connection.prepareStatement(query)) {
+            String searchPattern = "%" + searchTerm + "%";
+            statement.setString(1, searchPattern);
+            statement.setString(2, searchPattern);
+
+            try (ResultSet rs = statement.executeQuery()) {
+                while (rs.next()) {
+                    destinationList.add(crateHotelFromResultSet(rs));
+                }
             }
         }
         return destinationList;

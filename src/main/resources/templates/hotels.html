@@ -14,6 +14,10 @@
     <div class="container">
         <div class="input-group mb-3">
             <input type="text" id="searchQuery" class="form-control">
+            <select id="sortBy" class="custom-select col-3" aria-label="Sort hotel results">
+                <option value="name" selected>Sort by hotel name</option>
+                <option value="cityName">Sort by city</option>
+            </select>
             <div class="input-group-append">
                 <button class="btn btn-outline-primary" id="hotelSearchButton" type="button" onclick="search()">
                     Search
@@ -104,6 +108,10 @@
             return document.getElementById('searchQuery').value;
         }
 
+        function getSortBy() {
+            return document.getElementById('sortBy').value;
+        }
+
         function updateSearchResults(hotelList) {
             hotelList.forEach(addRow);
         }
@@ -113,9 +121,10 @@
             hideErrorMessage();
 
             const searchQuery = getSearchQuery();
+            const sortBy = getSortBy();
             updateSearchTerm(searchQuery);
 
-            fetch(`/api/hotels/search?query=${encodeURIComponent(searchQuery)}`)
+            fetch(`/api/hotels/search?query=${encodeURIComponent(searchQuery)}&sortBy=${encodeURIComponent(sortBy)}`)
                 .then(handleErrors)
                 .then(response => response.json())
                 .then(updateSearchResults)

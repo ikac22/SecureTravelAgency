@@ -125,7 +125,10 @@ public class HotelController {
 
     @GetMapping(value = "/api/hotels/search", produces = "application/json")
     @ResponseBody
-    public List<Hotel> search(@RequestParam("query") String query) throws SQLException {
-        return hotelRepository.search(query);
+    public List<Hotel> search(
+            @RequestParam("query") String query,
+            @RequestParam(value = "sortBy", defaultValue = "name") String sortBy
+    ) throws SQLException {
+        return hotelRepository.search(query, sortBy);
     }
 }
