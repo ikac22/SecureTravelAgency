@@ -31,11 +31,14 @@ public class HotelSnapshotService {
     );
 
     private final HotelSnapshotCsvExporter csvExporter;
+    private final HotelSnapshotCsvImporter csvImporter;
     private final HotelSnapshotRepository snapshotRepository;
 
     public HotelSnapshotService(HotelSnapshotCsvExporter csvExporter,
+                                HotelSnapshotCsvImporter csvImporter,
                                 HotelSnapshotRepository snapshotRepository) {
         this.csvExporter = csvExporter;
+        this.csvImporter = csvImporter;
         this.snapshotRepository = snapshotRepository;
     }
 
@@ -100,16 +103,26 @@ public class HotelSnapshotService {
 
         try {
             Files.createDirectories(extracted);
-            runTar(Arrays.asList(
-                    "tar",
-                    "-xzf",
-                    sourceArchive.toString(),
-                    "-C",
-                    extracted.toString()
-            ), "Could not extract snapshot archive");
-
+            extractArchive(sourceArchive, extracted, HotelSnapshotCsvExporter.SNAPSHOT_FILES);
             createArchive(extracted, result, files);
             return Files.readAllBytes(result);
+        } finally {
+            FileSystemUtils.deleteRecursively(workspace);
+        }
+    }
+
+    public HotelSnapshot rollbackToSnapshot(int hotelId, long snapshotId)
+            throws IOException, SQLException, InterruptedException {
+        Path sourceArchive = findSnapshotArchive(hotelId, snapshotId);
+        if (sourceArchive == null) {
+            return null;
+        }
+
+        Path workspace = Files.createTempDirectory("hotel-snapshot-rollback-");
+        try {
+            extractArchive(sourceArchive, workspace, HotelSnapshotCsvExporter.SNAPSHOT_FILES);
+            csvImporter.restoreHotelState(hotelId, snapshotId, workspace);
+            return snapshotRepository.findByIdAndHotel(snapshotId, hotelId);
         } finally {
             FileSystemUtils.deleteRecursively(workspace);
         }
@@ -140,6 +153,21 @@ public class HotelSnapshotService {
             }
         }
         return new ArrayList<>(uniqueFiles);
+    }
+
+    private void extractArchive(Path archive,
+                                Path directory,
+                                List<String> files) throws IOException, InterruptedException {
+        List<String> command = new ArrayList<>(Arrays.asList(
+                "tar",
+                "-xzf",
+                archive.toString(),
+                "-C",
+                directory.toString(),
+                "--"
+        ));
+        command.addAll(files);
+        runTar(command, "Could not extract snapshot archive");
     }
 
     private void createArchive(Path directory,
