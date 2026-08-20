@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Hotel Pricing</title>
+</head>
+<body>
+<div layout:fragment="content">
+    <h1>Hotel pricing</h1>
+
+    <p>
+        Configure an optional pricing formula for a specific hotel.
+        Hotels without a formula use the standard room price calculation.
+    </p>
+
+    <form method="GET" th:action="@{/pricing/formula}" class="col-6 pl-0 mb-3" th:if="${!hotels.isEmpty()}">
+        <div class="form-group">
+            <label for="hotelId"><strong>Hotel</strong></label>
+            <select id="hotelId" name="hotelId" class="form-control" onchange="this.form.submit()">
+                <option th:each="hotel : ${hotels}"
+                        th:value="${hotel.id}"
+                        th:text="${hotel.name + ' - ' + hotel.cityName}"
+                        th:selected="${selectedHotel != null and hotel.id == selectedHotel.id}">
+                </option>
+            </select>
+        </div>
+    </form>
+
+    <div class="alert alert-warning" th:if="${hotels.isEmpty()}">
+        There are no hotels available for pricing configuration.
+    </div>
+
+    <div th:if="${selectedHotel != null}">
+        <h4>
+            Pricing formula for
+            <span th:text="${selectedHotel.name}"></span>
+        </h4>
+
+        <div class="alert alert-secondary" th:if="${hasFormula == false}">
+            This hotel does not currently have a custom pricing formula.
+            Reservations use the standard calculation: room price × nights × room count.
+        </div>
+
+        <div class="alert alert-success" th:if="${saved == true}">
+            Pricing formula saved successfully for this hotel.
+        </div>
+
+        <div class="alert alert-danger" th:if="${error != null}" th:text="${error}"></div>
+
+        <div class="card mb-3">
+            <div class="card-body">
+                <h5 class="card-title">Available variables</h5>
+                <p class="card-text">Use variables with the <code>#</code> prefix:</p>
+                <ul>
+                    <li th:each="variable : ${availableVariables}">
+                        <code th:text="' #' + ${variable}"></code>
+                    </li>
+                </ul>
+                <p class="mb-1"><strong>Example:</strong></p>
+                <code>#basePrice * #nights * #roomsCount * 0.90</code>
+                <p class="mt-2 mb-1"><strong>Example with a returning-customer adjustment:</strong></p>
+                <code>(#basePrice * #nights * #roomsCount) - (#previousReservations * 5)</code>
+            </div>
+        </div>
+
+        <form method="POST" th:action="@{/pricing/formula}" class="col-8 pl-0">
+            <input type="hidden" name="hotelId" th:value="${selectedHotel.id}"/>
+
+            <div class="form-group">
+                <label for="formula"><strong>Hotel pricing formula</strong></label>
+                <textarea id="formula"
+                          name="formula"
+                          class="form-control"
+                          rows="5"
+                          maxlength="500"
+                          required
+                          th:text="${formula}"></textarea>
+                <small class="form-text text-muted">
+                    The formula is checked before it is saved. If the hotel has no formula,
+                    or a stored formula cannot be calculated for a reservation, the standard price is used.
+                </small>
+            </div>
+
+            <button type="submit" class="btn btn-primary">Validate and save for this hotel</button>
+        </form>
+    </div>
+</div>
+</body>
+</html>

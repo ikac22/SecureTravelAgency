@@ -7,6 +7,7 @@ drop table if exists hotel;
 drop table if exists tags;
 drop table if exists roomType;
 drop table if exists reservation;
+drop table if exists pricing_formula;
 drop table if exists ratings;
 drop table if exists roles;
 drop table if exists permissions;
@@ -68,7 +69,7 @@ CREATE TABLE roomType
 (
     id            int            NOT NULL AUTO_INCREMENT PRIMARY KEY,
     hotelId       int            NOT NULL,
-    name          varchar(100)   NOT NULL, -- e.g. "Double", "Suite"
+    name          varchar(100)   NOT NULL,
     capacity      int            NOT NULL,
     pricePerNight decimal(12, 2) NOT NULL,
     totalRooms    int            NOT NULL
@@ -85,6 +86,12 @@ CREATE TABLE reservation
     roomsCount  int            NOT NULL,
     guestsCount int            NOT NULL,
     totalPrice  decimal(12, 2) NOT NULL
+);
+
+create table pricing_formula
+(
+    hotelId int          NOT NULL PRIMARY KEY,
+    formula varchar(500) NOT NULL
 );
 
 create table ratings

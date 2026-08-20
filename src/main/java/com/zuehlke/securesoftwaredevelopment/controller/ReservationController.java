@@ -5,7 +5,10 @@ import com.zuehlke.securesoftwaredevelopment.domain.Hotel;
 import com.zuehlke.securesoftwaredevelopment.domain.Reservation;
 import com.zuehlke.securesoftwaredevelopment.domain.RoomType;
 import com.zuehlke.securesoftwaredevelopment.domain.User;
-import com.zuehlke.securesoftwaredevelopment.repository.*;
+import com.zuehlke.securesoftwaredevelopment.repository.HotelRepository;
+import com.zuehlke.securesoftwaredevelopment.repository.ReservationRepository;
+import com.zuehlke.securesoftwaredevelopment.repository.RoomRepository;
+import com.zuehlke.securesoftwaredevelopment.service.DynamicPricingService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -16,25 +19,35 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Controller
 public class ReservationController {
     private static final Logger LOG = LoggerFactory.getLogger(ReservationController.class);
     private static final AuditLogger auditLogger = AuditLogger.getAuditLogger(ReservationController.class);
 
-    private ReservationRepository reservationRepository;
-    private HotelRepository hotelRepository;
-    private RoomRepository roomRepository;
+    private final ReservationRepository reservationRepository;
+    private final HotelRepository hotelRepository;
+    private final RoomRepository roomRepository;
+    private final DynamicPricingService dynamicPricingService;
 
-    public ReservationController(ReservationRepository reservationRepository, HotelRepository hotelRepository, RoomRepository roomRepository) {
+    public ReservationController(
+            ReservationRepository reservationRepository,
+            HotelRepository hotelRepository,
+            RoomRepository roomRepository,
+            DynamicPricingService dynamicPricingService
+    ) {
         this.reservationRepository = reservationRepository;
         this.hotelRepository = hotelRepository;
         this.roomRepository = roomRepository;
+        this.dynamicPricingService = dynamicPricingService;
     }
 
     @GetMapping("/reservations/view")
@@ -69,6 +82,53 @@ public class ReservationController {
         return "reserve-hotel";
     }
 
+    @GetMapping(value = "/reservations/price", produces = "application/json")
+    @ResponseBody
+    public Map<String, Object> previewPrice(
+            @RequestParam Integer hotelId,
+            @RequestParam Integer roomTypeId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam Integer roomsCount,
+            @RequestParam Integer guestsCount,
+            Authentication authentication
+    ) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("available", false);
+
+        if (hotelId == null || roomTypeId == null || roomsCount == null || guestsCount == null) {
+            return response;
+        }
+        if (roomsCount <= 0 || guestsCount <= 0 || startDate == null || endDate == null || !endDate.isAfter(startDate)) {
+            return response;
+        }
+
+        RoomType roomType = roomRepository.findByIdAndHotelId(roomTypeId, hotelId);
+        if (roomType == null || guestsCount > roomType.getCapacity() * roomsCount) {
+            return response;
+        }
+
+        User user = (User) authentication.getPrincipal();
+        int previousReservations = reservationRepository.forUser(user.getId()).size();
+        long nights = ChronoUnit.DAYS.between(startDate, endDate);
+
+        DynamicPricingService.PricingResult pricingResult = dynamicPricingService.calculatePrice(
+                hotelId,
+                roomType.getPricePerNight(),
+                nights,
+                roomsCount,
+                guestsCount,
+                previousReservations
+        );
+
+        response.put("available", true);
+        response.put("price", pricingResult.getPrice().toPlainString());
+        response.put("defaultPrice", pricingResult.getDefaultPrice().toPlainString());
+        response.put("dynamicPricingApplied", pricingResult.isDynamicPricingApplied());
+        response.put("discountApplied", pricingResult.isDiscountApplied());
+        return response;
+    }
+
     @PostMapping("/reservations/create")
     public String createReservation(
             @RequestParam Integer hotelId,
@@ -97,11 +157,6 @@ public class ReservationController {
             return redirectPage + "?roomTypeError=true";
         }
 
-        long nights = ChronoUnit.DAYS.between(startDate, endDate);
-        BigDecimal totalPrice = roomType.getPricePerNight()
-                .multiply(BigDecimal.valueOf(nights))
-                .multiply(BigDecimal.valueOf(roomsCount));
-
         int maxGuests = roomType.getCapacity() * roomsCount;
         if (guestsCount > maxGuests) {
             return redirectPage + "?createError=true";
@@ -109,6 +164,19 @@ public class ReservationController {
 
         User user = (User) authentication.getPrincipal();
         Integer userId = user.getId();
+
+        long nights = ChronoUnit.DAYS.between(startDate, endDate);
+        int previousReservations = reservationRepository.forUser(userId).size();
+
+        DynamicPricingService.PricingResult pricingResult = dynamicPricingService.calculatePrice(
+                hotelId,
+                roomType.getPricePerNight(),
+                nights,
+                roomsCount,
+                guestsCount,
+                previousReservations
+        );
+        BigDecimal totalPrice = pricingResult.getPrice();
 
         Reservation r = new Reservation();
         r.setUserId(userId);

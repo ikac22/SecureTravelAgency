@@ -60,6 +60,19 @@
                 <span id="countError" style="color: red; display: none;">Rooms and guests must be positive numbers.</span>
             </div>
 
+            <div id="pricePreview" class="border rounded p-3 mt-3 mb-2" style="display: none;">
+                <div>
+                    Estimated total:
+                    <strong id="calculatedPrice"></strong>
+                </div>
+                <div id="regularPriceWrapper" class="text-muted" style="display: none;">
+                    Regular price: <del id="regularPrice"></del>
+                </div>
+                <div id="discountMessage" class="text-success font-weight-bold mt-1" style="display: none;">
+                    Oh, you just hit a discount!
+                </div>
+            </div>
+
             <button type="submit" class="btn btn-success mt-2">Create reservation</button>
         </form>
     </div>
@@ -71,6 +84,80 @@
     <div class="text-danger" th:if="${createError == true}">
         Sorry, reservation could not be created. Please try again.
     </div>
+
+    <script th:if="${created != true}">
+        (function () {
+            var hotelId = document.getElementById('hotelId');
+            var roomTypeId = document.getElementById('roomTypeId');
+            var startDate = document.getElementById('startDate');
+            var endDate = document.getElementById('endDate');
+            var roomsCount = document.getElementById('roomsCount');
+            var guestsCount = document.getElementById('guestsCount');
+            var pricePreview = document.getElementById('pricePreview');
+            var calculatedPrice = document.getElementById('calculatedPrice');
+            var regularPriceWrapper = document.getElementById('regularPriceWrapper');
+            var regularPrice = document.getElementById('regularPrice');
+            var discountMessage = document.getElementById('discountMessage');
+            var previewTimer;
+
+            function hidePreview() {
+                pricePreview.style.display = 'none';
+            }
+
+            function schedulePreview() {
+                window.clearTimeout(previewTimer);
+                previewTimer = window.setTimeout(loadPreview, 200);
+            }
+
+            function loadPreview() {
+                if (!roomTypeId.value || !startDate.value || !endDate.value || !roomsCount.value || !guestsCount.value) {
+                    hidePreview();
+                    return;
+                }
+
+                var url = '/reservations/price'
+                    + '?hotelId=' + encodeURIComponent(hotelId.value)
+                    + '&roomTypeId=' + encodeURIComponent(roomTypeId.value)
+                    + '&startDate=' + encodeURIComponent(startDate.value)
+                    + '&endDate=' + encodeURIComponent(endDate.value)
+                    + '&roomsCount=' + encodeURIComponent(roomsCount.value)
+                    + '&guestsCount=' + encodeURIComponent(guestsCount.value);
+
+                fetch(url)
+                    .then(function (response) {
+                        return response.json();
+                    })
+                    .then(function (pricing) {
+                        if (!pricing.available) {
+                            hidePreview();
+                            return;
+                        }
+
+                        calculatedPrice.textContent = '€' + pricing.price;
+                        pricePreview.style.display = 'block';
+
+                        if (pricing.discountApplied) {
+                            calculatedPrice.classList.add('text-success');
+                            regularPrice.textContent = '€' + pricing.defaultPrice;
+                            regularPriceWrapper.style.display = 'block';
+                            discountMessage.style.display = 'block';
+                        } else {
+                            calculatedPrice.classList.remove('text-success');
+                            regularPriceWrapper.style.display = 'none';
+                            discountMessage.style.display = 'none';
+                        }
+                    })
+                    .catch(function () {
+                        hidePreview();
+                    });
+            }
+
+            [roomTypeId, startDate, endDate, roomsCount, guestsCount].forEach(function (element) {
+                element.addEventListener('change', schedulePreview);
+                element.addEventListener('input', schedulePreview);
+            });
+        })();
+    </script>
 </div>
 </body>
 </html>
