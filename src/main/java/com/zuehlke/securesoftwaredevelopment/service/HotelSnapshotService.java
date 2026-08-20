@@ -50,7 +50,7 @@ public class HotelSnapshotService {
         try {
             csvExporter.exportHotelState(hotelId, workspace);
             Files.createDirectories(archivePath.getParent());
-            createArchive(workspace, archivePath);
+            createArchive(workspace, archivePath, HotelSnapshotCsvExporter.SNAPSHOT_FILES);
 
             long snapshotId = snapshotRepository.create(hotelId, fileName, createdAt, parentSnapshotId);
             return snapshotRepository.findByIdAndHotel(snapshotId, hotelId);
@@ -82,6 +82,48 @@ public class HotelSnapshotService {
         if (findSnapshotArchive(hotelId, snapshotId) == null) {
             return null;
         }
+        return normalizeSelectedFiles(selectedFiles);
+    }
+
+    public byte[] createSelectiveArchive(int hotelId,
+                                         long snapshotId,
+                                         List<String> selectedFiles) throws IOException, InterruptedException {
+        Path sourceArchive = findSnapshotArchive(hotelId, snapshotId);
+        if (sourceArchive == null) {
+            return null;
+        }
+
+        List<String> files = normalizeSelectedFiles(selectedFiles);
+        Path workspace = Files.createTempDirectory("hotel-snapshot-selection-");
+        Path extracted = workspace.resolve("extracted");
+        Path result = workspace.resolve("selected.tar.gz");
+
+        try {
+            Files.createDirectories(extracted);
+            runTar(Arrays.asList(
+                    "tar",
+                    "-xzf",
+                    sourceArchive.toString(),
+                    "-C",
+                    extracted.toString()
+            ), "Could not extract snapshot archive");
+
+            createArchive(extracted, result, files);
+            return Files.readAllBytes(result);
+        } finally {
+            FileSystemUtils.deleteRecursively(workspace);
+        }
+    }
+
+    Path snapshotPath(HotelSnapshot snapshot) {
+        return snapshotDirectory(snapshot.getHotelId()).resolve(snapshot.getFileName());
+    }
+
+    Path snapshotDirectory(int hotelId) {
+        return SNAPSHOT_ROOT.resolve(String.valueOf(hotelId));
+    }
+
+    private List<String> normalizeSelectedFiles(List<String> selectedFiles) {
         if (selectedFiles == null || selectedFiles.isEmpty()) {
             throw new IllegalArgumentException("Select at least one snapshot file");
         }
@@ -100,24 +142,21 @@ public class HotelSnapshotService {
         return new ArrayList<>(uniqueFiles);
     }
 
-    Path snapshotPath(HotelSnapshot snapshot) {
-        return snapshotDirectory(snapshot.getHotelId()).resolve(snapshot.getFileName());
-    }
-
-    Path snapshotDirectory(int hotelId) {
-        return SNAPSHOT_ROOT.resolve(String.valueOf(hotelId));
-    }
-
-    private void createArchive(Path workspace, Path archivePath) throws IOException, InterruptedException {
+    private void createArchive(Path directory,
+                               Path archivePath,
+                               List<String> files) throws IOException, InterruptedException {
         List<String> command = new ArrayList<>(Arrays.asList(
                 "tar",
                 "-czf",
                 archivePath.toString(),
                 "-C",
-                workspace.toString()
+                directory.toString()
         ));
-        command.addAll(HotelSnapshotCsvExporter.SNAPSHOT_FILES);
+        command.addAll(files);
+        runTar(command, "Could not create snapshot archive");
+    }
 
+    private void runTar(List<String> command, String errorMessage) throws IOException, InterruptedException {
         Process process = new ProcessBuilder(command)
                 .redirectErrorStream(true)
                 .start();
@@ -130,7 +169,7 @@ public class HotelSnapshotService {
 
         int exitCode = process.waitFor();
         if (exitCode != 0) {
-            throw new IOException("Could not create snapshot archive: " + output);
+            throw new IOException(errorMessage + ": " + output);
         }
     }
 
