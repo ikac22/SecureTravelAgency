@@ -60,6 +60,10 @@
                 <span id="countError" style="color: red; display: none;">Rooms and guests must be positive numbers.</span>
             </div>
 
+            <div class="text-danger mb-2" th:if="${pricingError == true}">
+                The reservation price could not be calculated. Please try again or contact support.
+            </div>
+
             <button type="submit" class="btn btn-success mt-2">Create reservation</button>
         </form>
     </div>
