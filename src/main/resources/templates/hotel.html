@@ -92,6 +92,7 @@
             <th>Created</th>
             <th>Previous baseline</th>
             <th>Status</th>
+            <th>Actions</th>
         </tr>
         </thead>
         <tbody>
@@ -101,6 +102,9 @@
             <td th:text="${snapshot.createdAt}"></td>
             <td th:text="${snapshot.parentFileName != null ? snapshot.parentFileName : '-'}"></td>
             <td th:text="${snapshot.baseline ? 'Baseline' : ''}"></td>
+            <td>
+                <a th:href="@{'/hotels/' + ${hotel.id} + '/snapshots/' + ${snapshot.id} + '/download'}">Download</a>
+            </td>
         </tr>
         </tbody>
     </table>
