@@ -6,8 +6,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import javax.script.ScriptException;
-
 @RestController
 public class DynamicPricingController {
 
@@ -17,12 +15,15 @@ public class DynamicPricingController {
         this.pricingService = pricingService;
     }
 
-    @GetMapping("/api/lab/pricing/calculate")
-    public ResponseEntity<Double> calculate(
+    @GetMapping("/api/lab/pricing/preview")
+    public ResponseEntity<Double> preview(
             @RequestParam double basePrice,
             @RequestParam int nights,
-            @RequestParam String rule
-    ) throws ScriptException {
-        return ResponseEntity.ok(pricingService.calculate(basePrice, nights, rule));
+            @RequestParam int previousReservations,
+            @RequestParam String formula
+    ) {
+        return ResponseEntity.ok(
+                pricingService.calculate(basePrice, nights, previousReservations, formula)
+        );
     }
 }
