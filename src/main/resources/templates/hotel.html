@@ -34,8 +34,7 @@
             </div>
             <div class="form-group">
                 <b><label>Description:</label></b>
-                <!-- Intentionally vulnerable: description is stored safely in the database, then rendered as raw HTML. -->
-                <label style="text-align: justify; display: block;" th:utext="${hotel.description}"></label>
+                <label id="hotelDescription" style="text-align: justify; display: block;"></label>
             </div>
             <div class="form-group">
                 <label>Rating:</label>
@@ -73,6 +72,15 @@
     </script>
     <script>
         window.addEventListener('load', function () {
+            fetch('/api/hotels/' + hotelId + '/description')
+                .then(function (response) {
+                    return response.json();
+                })
+                .then(function (hotelData) {
+                    // Intentionally vulnerable laboratory sink: data from JSON is interpreted as HTML.
+                    document.getElementById('hotelDescription')
+                        .insertAdjacentHTML('beforeend', hotelData.description);
+                });
 
             document.getElementById("rateHotel").addEventListener("click", function () {
                 const rating = document.querySelector('input[name="rating"]:checked').value;
