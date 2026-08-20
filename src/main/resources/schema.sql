@@ -69,7 +69,7 @@ CREATE TABLE roomType
 (
     id            int            NOT NULL AUTO_INCREMENT PRIMARY KEY,
     hotelId       int            NOT NULL,
-    name          varchar(100)   NOT NULL, -- e.g. "Double", "Suite"
+    name          varchar(100)   NOT NULL,
     capacity      int            NOT NULL,
     pricePerNight decimal(12, 2) NOT NULL,
     totalRooms    int            NOT NULL
@@ -90,7 +90,7 @@ CREATE TABLE reservation
 
 create table pricing_formula
 (
-    id      int          NOT NULL PRIMARY KEY,
+    hotelId int          NOT NULL PRIMARY KEY,
     formula varchar(500) NOT NULL
 );
 
