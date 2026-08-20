@@ -44,13 +44,13 @@ public class DynamicPricingService {
         return ALLOWED_VARIABLES;
     }
 
-    public String getActiveFormula() {
-        return pricingFormulaRepository.getActiveFormula();
+    public String getFormulaForHotel(int hotelId) {
+        return pricingFormulaRepository.getFormulaForHotel(hotelId);
     }
 
-    public void saveFormula(String pricingFormula) {
+    public void saveFormula(int hotelId, String pricingFormula) {
         validateFormula(pricingFormula);
-        pricingFormulaRepository.saveActiveFormula(pricingFormula);
+        pricingFormulaRepository.saveFormulaForHotel(hotelId, pricingFormula);
     }
 
     public void validateFormula(String pricingFormula) {
@@ -84,37 +84,60 @@ public class DynamicPricingService {
         }
     }
 
-    public BigDecimal calculatePrice(
+    public PricingResult calculatePrice(
+            int hotelId,
             BigDecimal basePrice,
             long nights,
             int roomsCount,
             int guestsCount,
             int previousReservations
     ) {
-        String pricingFormula = getActiveFormula();
-        Expression expression = parser.parseExpression(pricingFormula);
+        BigDecimal defaultPrice = calculateDefaultPrice(basePrice, nights, roomsCount);
 
-        Number result = expression.getValue(
-                createContext(
-                        basePrice.doubleValue(),
-                        nights,
-                        roomsCount,
-                        guestsCount,
-                        previousReservations
-                ),
-                Number.class
-        );
+        try {
+            String pricingFormula = pricingFormulaRepository.getFormulaForHotel(hotelId);
+            if (pricingFormula == null || pricingFormula.trim().isEmpty()) {
+                return PricingResult.defaultPrice(defaultPrice);
+            }
 
-        if (result == null) {
-            throw new IllegalStateException("Pricing formula did not return a numeric value");
+            Expression expression = parser.parseExpression(pricingFormula);
+            Number result = expression.getValue(
+                    createContext(
+                            basePrice.doubleValue(),
+                            nights,
+                            roomsCount,
+                            guestsCount,
+                            previousReservations
+                    ),
+                    Number.class
+            );
+
+            if (result == null) {
+                return PricingResult.defaultPrice(defaultPrice);
+            }
+
+            double numericResult = result.doubleValue();
+            if (Double.isNaN(numericResult) || Double.isInfinite(numericResult) || numericResult < 0) {
+                return PricingResult.defaultPrice(defaultPrice);
+            }
+
+            BigDecimal calculatedPrice = BigDecimal.valueOf(numericResult).setScale(2, RoundingMode.HALF_UP);
+            return new PricingResult(
+                    calculatedPrice,
+                    defaultPrice,
+                    true,
+                    calculatedPrice.compareTo(defaultPrice) < 0
+            );
+        } catch (RuntimeException e) {
+            return PricingResult.defaultPrice(defaultPrice);
         }
+    }
 
-        double numericResult = result.doubleValue();
-        if (Double.isNaN(numericResult) || Double.isInfinite(numericResult) || numericResult < 0) {
-            throw new IllegalStateException("Pricing formula returned an invalid price");
-        }
-
-        return BigDecimal.valueOf(numericResult).setScale(2, RoundingMode.HALF_UP);
+    public BigDecimal calculateDefaultPrice(BigDecimal basePrice, long nights, int roomsCount) {
+        return basePrice
+                .multiply(BigDecimal.valueOf(nights))
+                .multiply(BigDecimal.valueOf(roomsCount))
+                .setScale(2, RoundingMode.HALF_UP);
     }
 
     private void validateVariableNames(String pricingFormula) {
@@ -141,5 +164,44 @@ public class DynamicPricingService {
         context.setVariable("guestsCount", guestsCount);
         context.setVariable("previousReservations", previousReservations);
         return context;
+    }
+
+    public static class PricingResult {
+        private final BigDecimal price;
+        private final BigDecimal defaultPrice;
+        private final boolean dynamicPricingApplied;
+        private final boolean discountApplied;
+
+        public PricingResult(
+                BigDecimal price,
+                BigDecimal defaultPrice,
+                boolean dynamicPricingApplied,
+                boolean discountApplied
+        ) {
+            this.price = price;
+            this.defaultPrice = defaultPrice;
+            this.dynamicPricingApplied = dynamicPricingApplied;
+            this.discountApplied = discountApplied;
+        }
+
+        public static PricingResult defaultPrice(BigDecimal price) {
+            return new PricingResult(price, price, false, false);
+        }
+
+        public BigDecimal getPrice() {
+            return price;
+        }
+
+        public BigDecimal getDefaultPrice() {
+            return defaultPrice;
+        }
+
+        public boolean isDynamicPricingApplied() {
+            return dynamicPricingApplied;
+        }
+
+        public boolean isDiscountApplied() {
+            return discountApplied;
+        }
     }
 }
