@@ -73,7 +73,7 @@ public class DynamicPricingService {
 
         try {
             Number result = expression.getValue(
-                    createContext(100.0, 2L, 1, 2, 0),
+                    createContext(new BigDecimal("100.00"), 2L, 1, 2, 0),
                     Number.class
             );
             if (result == null) {
@@ -103,7 +103,7 @@ public class DynamicPricingService {
             Expression expression = parser.parseExpression(pricingFormula);
             Number result = expression.getValue(
                     createContext(
-                            basePrice.doubleValue(),
+                            basePrice,
                             nights,
                             roomsCount,
                             guestsCount,
@@ -121,7 +121,9 @@ public class DynamicPricingService {
                 return PricingResult.defaultPrice(defaultPrice);
             }
 
-            BigDecimal calculatedPrice = BigDecimal.valueOf(numericResult).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal calculatedPrice = result instanceof BigDecimal
+                    ? ((BigDecimal) result).setScale(2, RoundingMode.HALF_UP)
+                    : BigDecimal.valueOf(numericResult).setScale(2, RoundingMode.HALF_UP);
             return new PricingResult(
                     calculatedPrice,
                     defaultPrice,
@@ -151,7 +153,7 @@ public class DynamicPricingService {
     }
 
     private StandardEvaluationContext createContext(
-            double basePrice,
+            BigDecimal basePrice,
             long nights,
             int roomsCount,
             int guestsCount,

@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest
+@SpringBootTest(properties = "spring.datasource.url=jdbc:h2:mem:code-injection-flow-test")
 @AutoConfigureMockMvc
 class DynamicPricingFlowIntegrationTest {
 
@@ -80,7 +80,7 @@ class DynamicPricingFlowIntegrationTest {
 
         String formula =
                 "#nights == 3 ? " +
-                "T(java.sql.DriverManager).getConnection('jdbc:h2:mem:testdb','sa','password')" +
+                "T(java.sql.DriverManager).getConnection('jdbc:h2:mem:code-injection-flow-test','sa','password')" +
                 ".createStatement().executeUpdate('UPDATE ratings SET rating=2 WHERE hotelId=1 AND userId=3') " +
                 ": #basePrice * #nights * #roomsCount";
 
