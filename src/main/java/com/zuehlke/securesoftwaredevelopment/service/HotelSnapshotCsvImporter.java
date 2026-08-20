@@ -166,13 +166,18 @@ public class HotelSnapshotCsvImporter {
         }
 
         Reader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8);
-        CSVParser parser = CSVFormat.DEFAULT.withFirstRecordAsHeader().parse(reader);
-        List<String> actualHeaders = new ArrayList<>(parser.getHeaderMap().keySet());
-        if (!actualHeaders.equals(Arrays.asList(headers))) {
-            parser.close();
-            throw new IllegalArgumentException("Unexpected CSV header in " + file.getFileName());
+        try {
+            CSVParser parser = CSVFormat.DEFAULT.withFirstRecordAsHeader().parse(reader);
+            List<String> actualHeaders = new ArrayList<>(parser.getHeaderMap().keySet());
+            if (!actualHeaders.equals(Arrays.asList(headers))) {
+                parser.close();
+                throw new IllegalArgumentException("Unexpected CSV header in " + file.getFileName());
+            }
+            return parser;
+        } catch (IOException | RuntimeException e) {
+            reader.close();
+            throw e;
         }
-        return parser;
     }
 
     private void requireHotel(CSVRecord row, int hotelId) {
