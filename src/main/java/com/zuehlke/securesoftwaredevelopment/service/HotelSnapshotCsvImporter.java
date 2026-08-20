@@ -143,7 +143,8 @@ public class HotelSnapshotCsvImporter {
 
     private void updateHotel(Connection connection, HotelRow hotel, long snapshotId) throws SQLException {
         String sql = "UPDATE hotel SET cityId = ?, name = ?, description = ?, address = ?, baselineSnapshotId = ? " +
-                "WHERE id = ?";
+                "WHERE id = ? AND EXISTS (" +
+                "SELECT 1 FROM hotelSnapshot s WHERE s.id = ? AND s.hotelId = ?)";
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setInt(1, hotel.cityId);
             statement.setString(2, hotel.name);
@@ -151,8 +152,10 @@ public class HotelSnapshotCsvImporter {
             statement.setString(4, hotel.address);
             statement.setLong(5, snapshotId);
             statement.setInt(6, hotel.id);
+            statement.setLong(7, snapshotId);
+            statement.setInt(8, hotel.id);
             if (statement.executeUpdate() != 1) {
-                throw new IllegalArgumentException("Hotel does not exist: " + hotel.id);
+                throw new IllegalArgumentException("Snapshot does not belong to hotel");
             }
         }
     }
