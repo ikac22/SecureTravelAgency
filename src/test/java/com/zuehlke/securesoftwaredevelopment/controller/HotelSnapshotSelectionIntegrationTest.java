@@ -1,7 +1,6 @@
 package com.zuehlke.securesoftwaredevelopment.controller;
 
 import com.zuehlke.securesoftwaredevelopment.domain.HotelSnapshot;
-import com.zuehlke.securesoftwaredevelopment.repository.HotelSnapshotRepository;
 import com.zuehlke.securesoftwaredevelopment.service.HotelSnapshotService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -16,6 +15,8 @@ import javax.sql.DataSource;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.util.Arrays;
@@ -28,15 +29,17 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 @SpringBootTest
 class HotelSnapshotSelectionIntegrationTest {
     private static final int HOTEL_ID = 1;
+    private static final Path SNAPSHOT_DIRECTORY = Paths.get(
+            System.getProperty("java.io.tmpdir"),
+            "secure-travel-agency-snapshots",
+            String.valueOf(HOTEL_ID)
+    );
 
     @Autowired
     private HotelSnapshotController snapshotController;
 
     @Autowired
     private HotelSnapshotService snapshotService;
-
-    @Autowired
-    private HotelSnapshotRepository snapshotRepository;
 
     @Autowired
     private DataSource dataSource;
@@ -56,7 +59,7 @@ class HotelSnapshotSelectionIntegrationTest {
                 deleteSnapshots.executeUpdate();
             }
         }
-        FileSystemUtils.deleteRecursively(snapshotService.snapshotDirectory(HOTEL_ID));
+        FileSystemUtils.deleteRecursively(SNAPSHOT_DIRECTORY);
     }
 
     @Test
