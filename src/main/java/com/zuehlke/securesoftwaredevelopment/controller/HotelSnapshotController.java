@@ -12,11 +12,13 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
 @Controller
 @RequestMapping("/hotels/{hotelId}/snapshots")
@@ -53,5 +55,21 @@ public class HotelSnapshotController {
                 .contentType(MediaType.parseMediaType("application/gzip"))
                 .contentLength(Files.size(archive))
                 .body(resource);
+    }
+
+    @PostMapping("/{snapshotId}/selection")
+    @ResponseBody
+    public ResponseEntity<List<String>> selectSnapshotFiles(@PathVariable int hotelId,
+                                                             @PathVariable long snapshotId,
+                                                             @RequestParam(name = "files", required = false) List<String> files) {
+        try {
+            List<String> selectedFiles = snapshotService.prepareSelectiveDownload(hotelId, snapshotId, files);
+            if (selectedFiles == null) {
+                return ResponseEntity.notFound().build();
+            }
+            return ResponseEntity.ok(selectedFiles);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
     }
 }
