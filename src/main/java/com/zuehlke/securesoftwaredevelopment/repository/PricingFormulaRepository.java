@@ -11,20 +11,18 @@ import java.sql.SQLException;
 @Repository
 public class PricingFormulaRepository {
 
-    private static final int ACTIVE_FORMULA_ID = 1;
-
     private final DataSource dataSource;
 
     public PricingFormulaRepository(DataSource dataSource) {
         this.dataSource = dataSource;
     }
 
-    public String getActiveFormula() {
-        String query = "SELECT formula FROM pricing_formula WHERE id = ?";
+    public String getFormulaForHotel(int hotelId) {
+        String query = "SELECT formula FROM pricing_formula WHERE hotelId = ?";
 
         try (Connection connection = dataSource.getConnection();
              PreparedStatement statement = connection.prepareStatement(query)) {
-            statement.setInt(1, ACTIVE_FORMULA_ID);
+            statement.setInt(1, hotelId);
 
             try (ResultSet resultSet = statement.executeQuery()) {
                 if (resultSet.next()) {
@@ -32,26 +30,32 @@ public class PricingFormulaRepository {
                 }
             }
         } catch (SQLException e) {
-            throw new IllegalStateException("Could not load pricing formula", e);
+            throw new IllegalStateException("Could not load hotel pricing formula", e);
         }
 
-        throw new IllegalStateException("Active pricing formula is not configured");
+        return null;
     }
 
-    public void saveActiveFormula(String formula) {
-        String query = "UPDATE pricing_formula SET formula = ? WHERE id = ?";
+    public void saveFormulaForHotel(int hotelId, String formula) {
+        String update = "UPDATE pricing_formula SET formula = ? WHERE hotelId = ?";
 
         try (Connection connection = dataSource.getConnection();
-             PreparedStatement statement = connection.prepareStatement(query)) {
+             PreparedStatement statement = connection.prepareStatement(update)) {
             statement.setString(1, formula);
-            statement.setInt(2, ACTIVE_FORMULA_ID);
+            statement.setInt(2, hotelId);
 
-            int updatedRows = statement.executeUpdate();
-            if (updatedRows != 1) {
-                throw new IllegalStateException("Active pricing formula is not configured");
+            if (statement.executeUpdate() == 1) {
+                return;
+            }
+
+            String insert = "INSERT INTO pricing_formula(hotelId, formula) VALUES(?, ?)";
+            try (PreparedStatement insertStatement = connection.prepareStatement(insert)) {
+                insertStatement.setInt(1, hotelId);
+                insertStatement.setString(2, formula);
+                insertStatement.executeUpdate();
             }
         } catch (SQLException e) {
-            throw new IllegalStateException("Could not save pricing formula", e);
+            throw new IllegalStateException("Could not save hotel pricing formula", e);
         }
     }
 }
