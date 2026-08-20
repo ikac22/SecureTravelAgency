@@ -1,10 +1,12 @@
 package com.zuehlke.securesoftwaredevelopment.controller;
 
+import com.zuehlke.securesoftwaredevelopment.domain.HotelSnapshot;
 import com.zuehlke.securesoftwaredevelopment.service.HotelSnapshotService;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -15,6 +17,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -31,6 +34,33 @@ class HotelSnapshotControllerTest {
 
         verify(snapshotService).createSnapshot(1);
         assertEquals("redirect:/hotels?id=1", result);
+    }
+
+    @Test
+    void rollsBackSnapshotAndRedirectsBackToHotel() throws Exception {
+        HotelSnapshotService snapshotService = mock(HotelSnapshotService.class);
+        HotelSnapshotController controller = new HotelSnapshotController(snapshotService);
+        HotelSnapshot snapshot = mock(HotelSnapshot.class);
+        when(snapshotService.rollbackToSnapshot(1, 7L)).thenReturn(snapshot);
+
+        String result = controller.rollbackSnapshot(1, 7L);
+
+        verify(snapshotService).rollbackToSnapshot(1, 7L);
+        assertEquals("redirect:/hotels?id=1", result);
+    }
+
+    @Test
+    void returnsNotFoundWhenRollbackSnapshotDoesNotExist() throws Exception {
+        HotelSnapshotService snapshotService = mock(HotelSnapshotService.class);
+        HotelSnapshotController controller = new HotelSnapshotController(snapshotService);
+        when(snapshotService.rollbackToSnapshot(1, 99L)).thenReturn(null);
+
+        ResponseStatusException exception = assertThrows(
+                ResponseStatusException.class,
+                () -> controller.rollbackSnapshot(1, 99L)
+        );
+
+        assertEquals(HttpStatus.NOT_FOUND, exception.getStatus());
     }
 
     @Test
