@@ -9,6 +9,8 @@ import org.springframework.http.ResponseEntity;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -61,5 +63,31 @@ class HotelSnapshotControllerTest {
         ResponseEntity<Resource> response = controller.downloadSnapshot(1, 99L);
 
         assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+    }
+
+    @Test
+    void acceptsSelectedSnapshotFiles() {
+        HotelSnapshotService snapshotService = mock(HotelSnapshotService.class);
+        HotelSnapshotController controller = new HotelSnapshotController(snapshotService);
+        List<String> selection = Arrays.asList("hotel.csv", "ratings.csv");
+        when(snapshotService.prepareSelectiveDownload(1, 7L, selection)).thenReturn(selection);
+
+        ResponseEntity<List<String>> response = controller.selectSnapshotFiles(1, 7L, selection);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(selection, response.getBody());
+    }
+
+    @Test
+    void rejectsInvalidSelectedSnapshotFiles() {
+        HotelSnapshotService snapshotService = mock(HotelSnapshotService.class);
+        HotelSnapshotController controller = new HotelSnapshotController(snapshotService);
+        List<String> selection = Arrays.asList("../hotel.csv");
+        when(snapshotService.prepareSelectiveDownload(1, 7L, selection))
+                .thenThrow(new IllegalArgumentException("Invalid snapshot file selection"));
+
+        ResponseEntity<List<String>> response = controller.selectSnapshotFiles(1, 7L, selection);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
     }
 }
