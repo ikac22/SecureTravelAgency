@@ -4,6 +4,7 @@ import com.zuehlke.securesoftwaredevelopment.config.AuditLogger;
 import com.zuehlke.securesoftwaredevelopment.domain.*;
 import com.zuehlke.securesoftwaredevelopment.repository.CityRepository;
 import com.zuehlke.securesoftwaredevelopment.repository.HotelRepository;
+import com.zuehlke.securesoftwaredevelopment.repository.HotelSnapshotRepository;
 import com.zuehlke.securesoftwaredevelopment.repository.RatingRepository;
 import com.zuehlke.securesoftwaredevelopment.repository.RoomRepository;
 import org.slf4j.Logger;
@@ -14,10 +15,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
-import java.sql.Connection;
-import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.List;
 import java.util.Optional;
 
@@ -29,12 +27,18 @@ public class HotelController {
     private final RoomRepository roomRepository;
     private final CityRepository cityRepository;
     private final RatingRepository ratingRepository;
+    private final HotelSnapshotRepository hotelSnapshotRepository;
 
-    public HotelController(RoomRepository roomRepository, CityRepository cityRepository, HotelRepository hotelRepository, RatingRepository ratingRepository) {
+    public HotelController(RoomRepository roomRepository,
+                           CityRepository cityRepository,
+                           HotelRepository hotelRepository,
+                           RatingRepository ratingRepository,
+                           HotelSnapshotRepository hotelSnapshotRepository) {
         this.roomRepository = roomRepository;
         this.cityRepository = cityRepository;
         this.hotelRepository = hotelRepository;
         this.ratingRepository = ratingRepository;
+        this.hotelSnapshotRepository = hotelSnapshotRepository;
     }
 
     @GetMapping("/")
@@ -50,6 +54,7 @@ public class HotelController {
             return "hotels";
         }
         User user = (User) authentication.getPrincipal();
+        int hotelId = Integer.parseInt(id);
 
         List<Rating> ratings = ratingRepository.getAll(id);
         Optional<Rating> userRating = ratings.stream().filter(rating -> rating.getUserId() == user.getId()).findFirst();
@@ -60,7 +65,9 @@ public class HotelController {
             model.addAttribute("averageRating", avgRating);
         }
 
-        model.addAttribute("hotel", hotelRepository.get(Integer.valueOf(id)));
+        model.addAttribute("hotel", hotelRepository.get(hotelId));
+        model.addAttribute("snapshots", hotelSnapshotRepository.findAllForHotel(hotelId));
+        model.addAttribute("baselineSnapshot", hotelSnapshotRepository.findBaselineForHotel(hotelId));
 
         return "hotel";
     }
