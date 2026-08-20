@@ -81,6 +81,17 @@ class HotelSnapshotServiceTest {
                 () -> snapshotService.prepareSelectiveDownload(HOTEL_ID, first.getId(),
                         Collections.singletonList("../hotel.csv")));
 
+        byte[] selectedArchive = snapshotService.createSelectiveArchive(HOTEL_ID, first.getId(), selectedFiles);
+        assertNotNull(selectedArchive);
+        Path selectedArchiveFile = Files.createTempFile("hotel-selected-", ".tar.gz");
+        try {
+            Files.write(selectedArchiveFile, selectedArchive);
+            assertEquals(selectedFiles, archiveEntries(selectedArchiveFile));
+        } finally {
+            Files.deleteIfExists(selectedArchiveFile);
+        }
+        assertNull(snapshotService.createSelectiveArchive(2, first.getId(), selectedFiles));
+
         snapshotRepository.setBaselineForHotel(HOTEL_ID, first.getId());
         HotelSnapshot second = snapshotService.createSnapshot(HOTEL_ID);
 
