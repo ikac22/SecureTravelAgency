@@ -63,6 +63,48 @@
         <a th:href="@{'/reservations/new/' + ${hotel.id}}">Create a reservation</a>
     </div>
 
+    <hr>
+
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <div>
+            <h2 class="mb-1">Hotel snapshots</h2>
+            <div th:if="${baselineSnapshot != null}">
+                Current baseline:
+                <strong th:text="${baselineSnapshot.fileName}"></strong>
+            </div>
+            <div th:if="${baselineSnapshot == null}" class="text-muted">
+                No snapshot has been loaded as a baseline yet.
+            </div>
+        </div>
+        <form th:action="@{'/hotels/' + ${hotel.id} + '/snapshots'}" method="post">
+            <button class="btn btn-primary" type="submit">Create snapshot</button>
+        </form>
+    </div>
+
+    <div th:if="${snapshots.empty}" class="alert alert-secondary">
+        No snapshots have been created for this hotel.
+    </div>
+
+    <table th:if="${!snapshots.empty}" class="table table-striped table-sm">
+        <thead>
+        <tr>
+            <th>Snapshot</th>
+            <th>Created</th>
+            <th>Previous baseline</th>
+            <th>Status</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="snapshot : ${snapshots}"
+            th:classappend="${snapshot.baseline} ? 'font-weight-bold' : ''">
+            <td th:text="${snapshot.fileName}"></td>
+            <td th:text="${snapshot.createdAt}"></td>
+            <td th:text="${snapshot.parentFileName != null ? snapshot.parentFileName : '-'}"></td>
+            <td th:text="${snapshot.baseline ? 'Baseline' : ''}"></td>
+        </tr>
+        </tbody>
+    </table>
+
     <div class="mt-2 mb-2">
         <a href="/hotels">Back to hotels</a>
     </div>
