@@ -65,6 +65,9 @@
 
     <hr>
 
+    <div th:if="${snapshotSuccess}" class="alert alert-success" role="alert" th:text="${snapshotSuccess}"></div>
+    <div th:if="${snapshotError}" class="alert alert-danger" role="alert" th:text="${snapshotError}"></div>
+
     <div class="d-flex align-items-center justify-content-between mb-3">
         <div>
             <h2 class="mb-1">Hotel snapshots</h2>
