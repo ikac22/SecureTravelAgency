@@ -61,6 +61,20 @@ public class HotelSnapshotService {
         }
     }
 
+    public Path findSnapshotArchive(int hotelId, long snapshotId) {
+        HotelSnapshot snapshot = snapshotRepository.findByIdAndHotel(snapshotId, hotelId);
+        if (snapshot == null) {
+            return null;
+        }
+
+        Path directory = snapshotDirectory(hotelId).toAbsolutePath().normalize();
+        Path archive = directory.resolve(snapshot.getFileName()).normalize();
+        if (!archive.startsWith(directory) || !Files.isRegularFile(archive)) {
+            return null;
+        }
+        return archive;
+    }
+
     Path snapshotPath(HotelSnapshot snapshot) {
         return snapshotDirectory(snapshot.getHotelId()).resolve(snapshot.getFileName());
     }
