@@ -17,6 +17,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -73,6 +74,30 @@ public class HotelSnapshotService {
             return null;
         }
         return archive;
+    }
+
+    public List<String> prepareSelectiveDownload(int hotelId,
+                                                 long snapshotId,
+                                                 List<String> selectedFiles) {
+        if (findSnapshotArchive(hotelId, snapshotId) == null) {
+            return null;
+        }
+        if (selectedFiles == null || selectedFiles.isEmpty()) {
+            throw new IllegalArgumentException("Select at least one snapshot file");
+        }
+
+        LinkedHashSet<String> uniqueFiles = new LinkedHashSet<>(selectedFiles);
+        if (uniqueFiles.size() > HotelSnapshotCsvExporter.SNAPSHOT_FILES.size()) {
+            throw new IllegalArgumentException("Too many snapshot files selected");
+        }
+
+        for (String file : uniqueFiles) {
+            if (file == null || file.length() > 64 || !file.endsWith(".csv") ||
+                    file.contains("/") || file.contains("\\")) {
+                throw new IllegalArgumentException("Invalid snapshot file selection");
+            }
+        }
+        return new ArrayList<>(uniqueFiles);
     }
 
     Path snapshotPath(HotelSnapshot snapshot) {
