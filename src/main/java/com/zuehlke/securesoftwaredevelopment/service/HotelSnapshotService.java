@@ -99,13 +99,15 @@ public class HotelSnapshotService {
         List<String> files = normalizeSelectedFiles(selectedFiles);
         Path workspace = Files.createTempDirectory("hotel-snapshot-selection-");
         Path extracted = workspace.resolve("extracted");
-        Path result = workspace.resolve("selected.tar.gz");
+        Path tarArchive = workspace.resolve("selected.tar");
+        Path gzipArchive = workspace.resolve("selected.tar.gz");
 
         try {
             Files.createDirectories(extracted);
             extractArchive(sourceArchive, extracted, HotelSnapshotCsvExporter.SNAPSHOT_FILES);
-            createArchive(extracted, result, files);
-            return Files.readAllBytes(result);
+            createTarArchive(extracted, tarArchive, files);
+            gzip(tarArchive);
+            return Files.readAllBytes(gzipArchive);
         } finally {
             FileSystemUtils.deleteRecursively(workspace);
         }
@@ -167,7 +169,7 @@ public class HotelSnapshotService {
                 "--"
         ));
         command.addAll(files);
-        runTar(command, "Could not extract snapshot archive");
+        runCommand(command, "Could not extract snapshot archive");
     }
 
     private void createArchive(Path directory,
@@ -181,10 +183,29 @@ public class HotelSnapshotService {
                 directory.toString()
         ));
         command.addAll(files);
-        runTar(command, "Could not create snapshot archive");
+        runCommand(command, "Could not create snapshot archive");
     }
 
-    private void runTar(List<String> command, String errorMessage) throws IOException, InterruptedException {
+    private void createTarArchive(Path directory,
+                                  Path archivePath,
+                                  List<String> files) throws IOException, InterruptedException {
+        List<String> command = new ArrayList<>(Arrays.asList(
+                "tar",
+                "-cf",
+                archivePath.toString(),
+                "-C",
+                directory.toString()
+        ));
+        command.addAll(files);
+        runCommand(command, "Could not create selective snapshot archive");
+    }
+
+    private void gzip(Path archive) throws IOException, InterruptedException {
+        runCommand(Arrays.asList("gzip", "-f", archive.toString()),
+                "Could not compress selective snapshot archive");
+    }
+
+    private void runCommand(List<String> command, String errorMessage) throws IOException, InterruptedException {
         Process process = new ProcessBuilder(command)
                 .redirectErrorStream(true)
                 .start();
