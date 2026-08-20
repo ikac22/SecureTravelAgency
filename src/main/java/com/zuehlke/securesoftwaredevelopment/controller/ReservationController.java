@@ -5,7 +5,9 @@ import com.zuehlke.securesoftwaredevelopment.domain.Hotel;
 import com.zuehlke.securesoftwaredevelopment.domain.Reservation;
 import com.zuehlke.securesoftwaredevelopment.domain.RoomType;
 import com.zuehlke.securesoftwaredevelopment.domain.User;
-import com.zuehlke.securesoftwaredevelopment.repository.*;
+import com.zuehlke.securesoftwaredevelopment.repository.HotelRepository;
+import com.zuehlke.securesoftwaredevelopment.repository.ReservationRepository;
+import com.zuehlke.securesoftwaredevelopment.repository.RoomRepository;
 import com.zuehlke.securesoftwaredevelopment.service.DynamicPricingService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,11 +19,14 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Controller
 public class ReservationController {
@@ -65,8 +70,7 @@ public class ReservationController {
             Model model,
             @RequestParam(value = "cityInvalid", required = false) Boolean cityInvalid,
             @RequestParam(value = "countryMissing", required = false) Boolean countryMissing,
-            @RequestParam(value = "cityExists", required = false) Boolean cityExists,
-            @RequestParam(value = "pricingError", required = false) Boolean pricingError
+            @RequestParam(value = "cityExists", required = false) Boolean cityExists
     ) {
         Hotel hotel = hotelRepository.get(id);
         List<RoomType> roomTypes = roomRepository.getAllRoomTypes(id);
@@ -74,9 +78,55 @@ public class ReservationController {
         model.addAttribute("id", id);
         model.addAttribute("hotel", hotel);
         model.addAttribute("roomTypes", roomTypes);
-        model.addAttribute("pricingError", Boolean.TRUE.equals(pricingError));
 
         return "reserve-hotel";
+    }
+
+    @GetMapping(value = "/reservations/price", produces = "application/json")
+    @ResponseBody
+    public Map<String, Object> previewPrice(
+            @RequestParam Integer hotelId,
+            @RequestParam Integer roomTypeId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam Integer roomsCount,
+            @RequestParam Integer guestsCount,
+            Authentication authentication
+    ) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("available", false);
+
+        if (hotelId == null || roomTypeId == null || roomsCount == null || guestsCount == null) {
+            return response;
+        }
+        if (roomsCount <= 0 || guestsCount <= 0 || startDate == null || endDate == null || !endDate.isAfter(startDate)) {
+            return response;
+        }
+
+        RoomType roomType = roomRepository.findByIdAndHotelId(roomTypeId, hotelId);
+        if (roomType == null || guestsCount > roomType.getCapacity() * roomsCount) {
+            return response;
+        }
+
+        User user = (User) authentication.getPrincipal();
+        int previousReservations = reservationRepository.forUser(user.getId()).size();
+        long nights = ChronoUnit.DAYS.between(startDate, endDate);
+
+        DynamicPricingService.PricingResult pricingResult = dynamicPricingService.calculatePrice(
+                hotelId,
+                roomType.getPricePerNight(),
+                nights,
+                roomsCount,
+                guestsCount,
+                previousReservations
+        );
+
+        response.put("available", true);
+        response.put("price", pricingResult.getPrice().toPlainString());
+        response.put("defaultPrice", pricingResult.getDefaultPrice().toPlainString());
+        response.put("dynamicPricingApplied", pricingResult.isDynamicPricingApplied());
+        response.put("discountApplied", pricingResult.isDiscountApplied());
+        return response;
     }
 
     @PostMapping("/reservations/create")
@@ -118,19 +168,15 @@ public class ReservationController {
         long nights = ChronoUnit.DAYS.between(startDate, endDate);
         int previousReservations = reservationRepository.forUser(userId).size();
 
-        BigDecimal totalPrice;
-        try {
-            totalPrice = dynamicPricingService.calculatePrice(
-                    roomType.getPricePerNight(),
-                    nights,
-                    roomsCount,
-                    guestsCount,
-                    previousReservations
-            );
-        } catch (RuntimeException e) {
-            LOG.error("Could not calculate reservation price", e);
-            return redirectPage + "?pricingError=true";
-        }
+        DynamicPricingService.PricingResult pricingResult = dynamicPricingService.calculatePrice(
+                hotelId,
+                roomType.getPricePerNight(),
+                nights,
+                roomsCount,
+                guestsCount,
+                previousReservations
+        );
+        BigDecimal totalPrice = pricingResult.getPrice();
 
         Reservation r = new Reservation();
         r.setUserId(userId);
