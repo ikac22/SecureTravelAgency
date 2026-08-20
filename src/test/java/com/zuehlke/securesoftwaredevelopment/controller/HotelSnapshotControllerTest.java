@@ -7,7 +7,10 @@ import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -17,8 +20,10 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -29,35 +34,74 @@ class HotelSnapshotControllerTest {
     void createsSnapshotAndRedirectsBackToHotel() throws Exception {
         HotelSnapshotService snapshotService = mock(HotelSnapshotService.class);
         HotelSnapshotController controller = new HotelSnapshotController(snapshotService);
+        RedirectAttributes attributes = new RedirectAttributesModelMap();
 
-        String result = controller.createSnapshot(1);
+        String result = controller.createSnapshot(1, attributes);
 
         verify(snapshotService).createSnapshot(1);
         assertEquals("redirect:/hotels?id=1", result);
+        assertEquals("Snapshot created successfully.", attributes.getFlashAttributes().get("snapshotSuccess"));
+        assertNull(attributes.getFlashAttributes().get("snapshotError"));
+    }
+
+    @Test
+    void reportsSnapshotCreationFailureWithoutExposingException() throws Exception {
+        HotelSnapshotService snapshotService = mock(HotelSnapshotService.class);
+        HotelSnapshotController controller = new HotelSnapshotController(snapshotService);
+        RedirectAttributes attributes = new RedirectAttributesModelMap();
+        doThrow(new IOException("tar: internal command details"))
+                .when(snapshotService).createSnapshot(1);
+
+        String result = controller.createSnapshot(1, attributes);
+
+        assertEquals("redirect:/hotels?id=1", result);
+        assertEquals("Could not create snapshot. Please try again.",
+                attributes.getFlashAttributes().get("snapshotError"));
+        assertNull(attributes.getFlashAttributes().get("snapshotSuccess"));
     }
 
     @Test
     void rollsBackSnapshotAndRedirectsBackToHotel() throws Exception {
         HotelSnapshotService snapshotService = mock(HotelSnapshotService.class);
         HotelSnapshotController controller = new HotelSnapshotController(snapshotService);
+        RedirectAttributes attributes = new RedirectAttributesModelMap();
         HotelSnapshot snapshot = mock(HotelSnapshot.class);
         when(snapshotService.rollbackToSnapshot(1, 7L)).thenReturn(snapshot);
 
-        String result = controller.rollbackSnapshot(1, 7L);
+        String result = controller.rollbackSnapshot(1, 7L, attributes);
 
         verify(snapshotService).rollbackToSnapshot(1, 7L);
         assertEquals("redirect:/hotels?id=1", result);
+        assertEquals("Snapshot restored successfully.", attributes.getFlashAttributes().get("snapshotSuccess"));
+        assertNull(attributes.getFlashAttributes().get("snapshotError"));
+    }
+
+    @Test
+    void reportsRollbackFailureWithoutExposingException() throws Exception {
+        HotelSnapshotService snapshotService = mock(HotelSnapshotService.class);
+        HotelSnapshotController controller = new HotelSnapshotController(snapshotService);
+        RedirectAttributes attributes = new RedirectAttributesModelMap();
+        when(snapshotService.rollbackToSnapshot(1, 7L))
+                .thenThrow(new IOException("malformed archive details"));
+
+        String result = controller.rollbackSnapshot(1, 7L, attributes);
+
+        assertEquals("redirect:/hotels?id=1", result);
+        assertEquals("Could not restore snapshot. The current hotel state was not changed.",
+                attributes.getFlashAttributes().get("snapshotError"));
+        assertNull(attributes.getFlashAttributes().get("snapshotSuccess"));
     }
 
     @Test
     void returnsNotFoundWhenRollbackSnapshotDoesNotExist() throws Exception {
         HotelSnapshotService snapshotService = mock(HotelSnapshotService.class);
         HotelSnapshotController controller = new HotelSnapshotController(snapshotService);
+        RedirectAttributes attributes = new RedirectAttributesModelMap();
         when(snapshotService.rollbackToSnapshot(1, 99L)).thenReturn(null);
 
         ResponseStatusException exception = assertThrows(
                 ResponseStatusException.class,
-                () -> controller.rollbackSnapshot(1, 99L)
+                () -> controller.rollbackSnapshot(1, 99L, attributes)
         );
 
         assertEquals(HttpStatus.NOT_FOUND, exception.getStatus());
