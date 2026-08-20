@@ -59,15 +59,27 @@ public class HotelSnapshotController {
 
     @PostMapping("/{snapshotId}/selection")
     @ResponseBody
-    public ResponseEntity<List<String>> selectSnapshotFiles(@PathVariable int hotelId,
-                                                             @PathVariable long snapshotId,
-                                                             @RequestParam(name = "files", required = false) List<String> files) {
+    public ResponseEntity<byte[]> downloadSelectedSnapshot(@PathVariable int hotelId,
+                                                           @PathVariable long snapshotId,
+                                                           @RequestParam(name = "files", required = false) List<String> files)
+            throws IOException, InterruptedException {
         try {
-            List<String> selectedFiles = snapshotService.prepareSelectiveDownload(hotelId, snapshotId, files);
-            if (selectedFiles == null) {
+            byte[] archive = snapshotService.createSelectiveArchive(hotelId, snapshotId, files);
+            if (archive == null) {
                 return ResponseEntity.notFound().build();
             }
-            return ResponseEntity.ok(selectedFiles);
+
+            String fileName = "hotel-" + hotelId + "-snapshot-" + snapshotId + "-selected.tar.gz";
+            String disposition = ContentDisposition.builder("attachment")
+                    .filename(fileName)
+                    .build()
+                    .toString();
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, disposition)
+                    .contentType(MediaType.parseMediaType("application/gzip"))
+                    .contentLength(archive.length)
+                    .body(archive);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().build();
         }
