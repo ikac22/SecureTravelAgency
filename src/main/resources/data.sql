@@ -74,8 +74,8 @@ insert into reservation
 (userId, hotelId, roomTypeId, startDate, endDate, roomsCount, guestsCount, totalPrice)
 values (1, 3, 6, DATE '2026-05-15', DATE '2026-05-18', 1, 3, 507.00);
 
-insert into pricing_formula(id, formula)
-values (1, '#basePrice * #nights * #roomsCount');
+insert into pricing_formula(hotelId, formula)
+values (1, '#basePrice * #nights * #roomsCount * 0.90');
 
 insert into ratings(hotelId, userId, rating)
 values (1, 3, 5),
