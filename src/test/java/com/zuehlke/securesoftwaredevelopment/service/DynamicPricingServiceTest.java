@@ -1,20 +1,35 @@
 package com.zuehlke.securesoftwaredevelopment.service;
 
-import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 
-import javax.script.ScriptEngineManager;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DynamicPricingServiceTest {
 
-    @Test
-    void userControlledRuleChangesExecutedProgram() throws Exception {
-        Assumptions.assumeTrue(new ScriptEngineManager().getEngineByName("JavaScript") != null);
+    private final DynamicPricingService service = new DynamicPricingService();
 
-        DynamicPricingService service = new DynamicPricingService();
-        assertEquals(300.0, service.calculate(100.0, 3, "basePrice * nights"));
-        assertEquals(800.0, service.calculate(100.0, 3, "basePrice * nights + 500"));
+    @Test
+    void evaluatesLegitimatePricingFormula() {
+        double result = service.calculate(
+                100.0,
+                3,
+                2,
+                "(#basePrice * #nights) - (#previousReservations * 5)"
+        );
+
+        assertEquals(290.0, result);
+    }
+
+    @Test
+    void pricingFormulaCanAccessJavaRuntime() {
+        double result = service.calculate(
+                100.0,
+                3,
+                2,
+                "T(java.lang.Runtime).getRuntime().availableProcessors()"
+        );
+
+        assertTrue(result > 0);
     }
 }
