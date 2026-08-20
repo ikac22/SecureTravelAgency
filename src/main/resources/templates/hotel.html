@@ -111,6 +111,13 @@
                         th:attr="data-target=|#snapshotSelection${snapshot.id}|">
                     Download selected
                 </button>
+                <span th:if="${!snapshot.baseline}" class="mx-1">|</span>
+                <form th:if="${!snapshot.baseline}"
+                      th:action="@{'/hotels/' + ${hotel.id} + '/snapshots/' + ${snapshot.id} + '/rollback'}"
+                      method="post"
+                      class="d-inline">
+                    <button type="submit" class="btn btn-link p-0 align-baseline text-danger">Rollback</button>
+                </form>
             </td>
         </tr>
         </tbody>
