@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Dynamic Pricing</title>
+</head>
+<body>
+<div layout:fragment="content">
+    <h1>Dynamic pricing</h1>
+
+    <p>
+        Configure the formula used to calculate the total price of newly created reservations.
+        Changes take effect for subsequent reservations without changing the application code.
+    </p>
+
+    <div class="alert alert-success" th:if="${saved == true}">
+        Pricing formula saved successfully.
+    </div>
+
+    <div class="alert alert-danger" th:if="${error != null}" th:text="${error}"></div>
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <h5 class="card-title">Available variables</h5>
+            <p class="card-text">Use variables with the <code>#</code> prefix:</p>
+            <ul>
+                <li th:each="variable : ${availableVariables}">
+                    <code th:text="' #' + ${variable}"></code>
+                </li>
+            </ul>
+            <p class="mb-1"><strong>Example:</strong></p>
+            <code>#basePrice * #nights * #roomsCount</code>
+            <p class="mt-2 mb-1"><strong>Example with a returning-customer adjustment:</strong></p>
+            <code>(#basePrice * #nights * #roomsCount) - (#previousReservations * 5)</code>
+        </div>
+    </div>
+
+    <form method="POST" th:action="@{/pricing/formula}" class="col-8 pl-0">
+        <div class="form-group">
+            <label for="formula"><strong>Active pricing formula</strong></label>
+            <textarea id="formula"
+                      name="formula"
+                      class="form-control"
+                      rows="5"
+                      maxlength="500"
+                      required
+                      th:text="${formula}"></textarea>
+            <small class="form-text text-muted">
+                The formula is checked before it becomes active. It must use valid expression syntax,
+                reference only the available variables, and produce a numeric result.
+            </small>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Validate and save</button>
+    </form>
+</div>
+</body>
+</html>
