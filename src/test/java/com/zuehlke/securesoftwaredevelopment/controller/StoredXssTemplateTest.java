@@ -12,13 +12,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class StoredXssTemplateTest {
 
     @Test
-    void hotelDescriptionIsRenderedAsUnescapedHtml() throws Exception {
+    void storedDescriptionIsInsertedIntoDomAsHtml() throws Exception {
         String template = new String(
                 Files.readAllBytes(Paths.get("src/main/resources/templates/hotel.html")),
                 StandardCharsets.UTF_8
         );
 
-        assertTrue(template.contains("th:utext=\"${hotel.description}\""));
-        assertFalse(template.contains("th:text=\"${hotel.description}\""));
+        assertTrue(template.contains("fetch('/api/hotels/' + hotelId + '/description')"));
+        assertTrue(template.contains("insertAdjacentHTML('beforeend', hotelData.description)"));
+        assertFalse(template.contains("th:utext=\"${hotel.description}\""));
     }
 }
