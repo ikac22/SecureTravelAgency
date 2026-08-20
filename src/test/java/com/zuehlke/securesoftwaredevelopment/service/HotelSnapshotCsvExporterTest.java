@@ -3,11 +3,12 @@ package com.zuehlke.securesoftwaredevelopment.service;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.util.FileSystemUtils;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -22,9 +23,13 @@ class HotelSnapshotCsvExporterTest {
 
     @Test
     void exportsOnlySelectedHotelStateIntoSeparateCsvFiles() throws Exception {
-        Path workspace = exporter.exportHotelState(1);
+        Path workspace = Files.createTempDirectory("hotel-snapshot-export-test-");
         try {
-            assertEquals(HotelSnapshotCsvExporter.SNAPSHOT_FILES.size(), Files.list(workspace).count());
+            exporter.exportHotelState(1, workspace);
+
+            try (Stream<Path> files = Files.list(workspace)) {
+                assertEquals(HotelSnapshotCsvExporter.SNAPSHOT_FILES.size(), files.count());
+            }
 
             List<String> hotel = Files.readAllLines(workspace.resolve(HotelSnapshotCsvExporter.HOTEL_CSV));
             assertEquals("id,cityId,name,description,address", hotel.get(0));
@@ -50,24 +55,17 @@ class HotelSnapshotCsvExporterTest {
             assertEquals("1,2,4", ratings.get(2));
             assertEquals("1,3,5", ratings.get(3));
         } finally {
-            deleteRecursively(workspace);
+            FileSystemUtils.deleteRecursively(workspace);
         }
     }
 
     @Test
-    void rejectsUnknownHotel() {
-        assertThrows(IllegalArgumentException.class, () -> exporter.exportHotelState(99999));
-    }
-
-    private void deleteRecursively(Path root) throws Exception {
-        try (java.util.stream.Stream<Path> paths = Files.walk(root)) {
-            paths.sorted(Comparator.reverseOrder()).forEach(path -> {
-                try {
-                    Files.deleteIfExists(path);
-                } catch (Exception e) {
-                    throw new RuntimeException(e);
-                }
-            });
+    void rejectsUnknownHotel() throws Exception {
+        Path workspace = Files.createTempDirectory("hotel-snapshot-export-test-");
+        try {
+            assertThrows(IllegalArgumentException.class, () -> exporter.exportHotelState(99999, workspace));
+        } finally {
+            FileSystemUtils.deleteRecursively(workspace);
         }
     }
 }
