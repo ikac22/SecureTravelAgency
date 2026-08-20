@@ -1,28 +1,37 @@
 package com.zuehlke.securesoftwaredevelopment.service;
 
+import org.springframework.expression.Expression;
+import org.springframework.expression.ExpressionParser;
+import org.springframework.expression.spel.standard.SpelExpressionParser;
+import org.springframework.expression.spel.support.StandardEvaluationContext;
 import org.springframework.stereotype.Service;
-
-import javax.script.ScriptEngine;
-import javax.script.ScriptEngineManager;
-import javax.script.ScriptException;
 
 @Service
 public class DynamicPricingService {
 
-    public double calculate(double basePrice, int nights, String pricingRule) throws ScriptException {
-        ScriptEngine engine = new ScriptEngineManager().getEngineByName("JavaScript");
-        if (engine == null) {
-            throw new IllegalStateException("JavaScript engine is not available");
+    private final ExpressionParser parser = new SpelExpressionParser();
+
+    public double calculate(
+            double basePrice,
+            int nights,
+            int previousReservations,
+            String pricingFormula
+    ) {
+        if (pricingFormula == null || pricingFormula.length() > 200) {
+            throw new IllegalArgumentException("Invalid pricing formula");
         }
 
-        engine.put("basePrice", basePrice);
-        engine.put("nights", nights);
+        StandardEvaluationContext context = new StandardEvaluationContext();
+        context.setVariable("basePrice", basePrice);
+        context.setVariable("nights", nights);
+        context.setVariable("previousReservations", previousReservations);
 
-        Object result = engine.eval(pricingRule);
-        if (!(result instanceof Number)) {
-            throw new IllegalArgumentException("Pricing rule must return a number");
+        Expression expression = parser.parseExpression(pricingFormula);
+        Number result = expression.getValue(context, Number.class);
+        if (result == null) {
+            throw new IllegalArgumentException("Pricing formula must return a number");
         }
 
-        return ((Number) result).doubleValue();
+        return result.doubleValue();
     }
 }
