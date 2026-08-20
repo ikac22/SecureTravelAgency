@@ -104,10 +104,66 @@
             <td th:text="${snapshot.baseline ? 'Baseline' : ''}"></td>
             <td>
                 <a th:href="@{'/hotels/' + ${hotel.id} + '/snapshots/' + ${snapshot.id} + '/download'}">Download</a>
+                <span class="mx-1">|</span>
+                <button type="button"
+                        class="btn btn-link p-0 align-baseline"
+                        data-toggle="modal"
+                        th:attr="data-target=|#snapshotSelection${snapshot.id}|">
+                    Download selected
+                </button>
             </td>
         </tr>
         </tbody>
     </table>
+
+    <div th:each="snapshot : ${snapshots}"
+         class="modal fade"
+         th:id="|snapshotSelection${snapshot.id}|"
+         tabindex="-1"
+         role="dialog"
+         aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Select snapshot files</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <form class="snapshot-selection-form"
+                      th:action="@{'/hotels/' + ${hotel.id} + '/snapshots/' + ${snapshot.id} + '/selection'}"
+                      method="post">
+                    <div class="modal-body">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="files" value="hotel.csv"
+                                   th:id="|hotelCsv${snapshot.id}|" checked>
+                            <label class="form-check-label" th:for="|hotelCsv${snapshot.id}|">hotel.csv</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="files" value="room-types.csv"
+                                   th:id="|roomTypesCsv${snapshot.id}|" checked>
+                            <label class="form-check-label" th:for="|roomTypesCsv${snapshot.id}|">room-types.csv</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="files" value="reservations.csv"
+                                   th:id="|reservationsCsv${snapshot.id}|" checked>
+                            <label class="form-check-label" th:for="|reservationsCsv${snapshot.id}|">reservations.csv</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="files" value="ratings.csv"
+                                   th:id="|ratingsCsv${snapshot.id}|" checked>
+                            <label class="form-check-label" th:for="|ratingsCsv${snapshot.id}|">ratings.csv</label>
+                        </div>
+                        <div class="selection-result small mt-3"></div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Use selection</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 
     <div class="mt-2 mb-2">
         <a href="/hotels">Back to hotels</a>
@@ -133,6 +189,29 @@
                 }).then(function () {
                     console.log(window.location)
                     window.location.reload();
+                });
+            });
+
+            document.querySelectorAll('.snapshot-selection-form').forEach(function (form) {
+                form.addEventListener('submit', function (event) {
+                    event.preventDefault();
+                    const result = form.querySelector('.selection-result');
+
+                    fetch(form.action, {
+                        method: 'POST',
+                        body: new FormData(form)
+                    }).then(function (response) {
+                        if (!response.ok) {
+                            throw new Error('Invalid snapshot file selection');
+                        }
+                        return response.json();
+                    }).then(function (files) {
+                        result.className = 'selection-result small mt-3 text-success';
+                        result.textContent = 'Selected: ' + files.join(', ');
+                    }).catch(function () {
+                        result.className = 'selection-result small mt-3 text-danger';
+                        result.textContent = 'Select at least one valid CSV file.';
+                    });
                 });
             });
         });
