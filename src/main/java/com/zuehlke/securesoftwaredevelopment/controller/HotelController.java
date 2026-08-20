@@ -14,11 +14,10 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
-import java.sql.Connection;
-import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Controller
@@ -121,6 +120,15 @@ public class HotelController {
     public ResponseEntity<List<RoomType>> getRoomTypesForHotel(@PathVariable Integer hotelId) {
         List<RoomType> result = roomRepository.getAllRoomTypes(hotelId);
         return ResponseEntity.ok(result);
+    }
+
+    @GetMapping(value = "/api/hotels/{hotelId}/description", produces = "application/json")
+    @ResponseBody
+    public Map<String, String> getHotelDescription(@PathVariable Integer hotelId) {
+        Hotel hotel = hotelRepository.get(hotelId);
+        Map<String, String> response = new HashMap<>();
+        response.put("description", hotel == null ? "" : hotel.getDescription());
+        return response;
     }
 
     @GetMapping(value = "/api/hotels/search", produces = "application/json")
