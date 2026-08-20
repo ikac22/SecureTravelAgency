@@ -17,7 +17,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
-import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -66,6 +65,9 @@ class HotelSnapshotServiceTest {
         assertNull(first.getParentSnapshotId());
         assertTrue(Files.isRegularFile(snapshotService.snapshotPath(first)));
         assertEquals(HotelSnapshotCsvExporter.SNAPSHOT_FILES, archiveEntries(snapshotService.snapshotPath(first)));
+        assertEquals(snapshotService.snapshotPath(first).toAbsolutePath().normalize(),
+                snapshotService.findSnapshotArchive(HOTEL_ID, first.getId()));
+        assertNull(snapshotService.findSnapshotArchive(2, first.getId()));
 
         snapshotRepository.setBaselineForHotel(HOTEL_ID, first.getId());
         HotelSnapshot second = snapshotService.createSnapshot(HOTEL_ID);
