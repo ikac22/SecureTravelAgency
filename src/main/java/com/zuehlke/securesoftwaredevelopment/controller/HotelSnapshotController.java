@@ -5,6 +5,7 @@ import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -32,6 +34,15 @@ public class HotelSnapshotController {
     @PostMapping
     public String createSnapshot(@PathVariable int hotelId) throws Exception {
         snapshotService.createSnapshot(hotelId);
+        return "redirect:/hotels?id=" + hotelId;
+    }
+
+    @PostMapping("/{snapshotId}/rollback")
+    public String rollbackSnapshot(@PathVariable int hotelId,
+                                   @PathVariable long snapshotId) throws Exception {
+        if (snapshotService.rollbackToSnapshot(hotelId, snapshotId) == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
         return "redirect:/hotels?id=" + hotelId;
     }
 
