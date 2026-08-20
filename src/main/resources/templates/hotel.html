@@ -34,7 +34,8 @@
             </div>
             <div class="form-group">
                 <b><label>Description:</label></b>
-                <label style="text-align: justify; display: block;" th:text="${hotel.description}"></label>
+                <!-- Intentionally vulnerable: description is stored safely in the database, then rendered as raw HTML. -->
+                <label style="text-align: justify; display: block;" th:utext="${hotel.description}"></label>
             </div>
             <div class="form-group">
                 <label>Rating:</label>
