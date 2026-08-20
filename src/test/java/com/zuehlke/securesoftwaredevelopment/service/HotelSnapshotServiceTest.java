@@ -17,6 +17,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -68,6 +70,16 @@ class HotelSnapshotServiceTest {
         assertEquals(snapshotService.snapshotPath(first).toAbsolutePath().normalize(),
                 snapshotService.findSnapshotArchive(HOTEL_ID, first.getId()));
         assertNull(snapshotService.findSnapshotArchive(2, first.getId()));
+
+        List<String> selectedFiles = Arrays.asList("hotel.csv", "ratings.csv");
+        assertEquals(selectedFiles,
+                snapshotService.prepareSelectiveDownload(HOTEL_ID, first.getId(), selectedFiles));
+        assertNull(snapshotService.prepareSelectiveDownload(2, first.getId(), selectedFiles));
+        assertThrows(IllegalArgumentException.class,
+                () -> snapshotService.prepareSelectiveDownload(HOTEL_ID, first.getId(), Collections.emptyList()));
+        assertThrows(IllegalArgumentException.class,
+                () -> snapshotService.prepareSelectiveDownload(HOTEL_ID, first.getId(),
+                        Collections.singletonList("../hotel.csv")));
 
         snapshotRepository.setBaselineForHotel(HOTEL_ID, first.getId());
         HotelSnapshot second = snapshotService.createSnapshot(HOTEL_ID);
