@@ -1,0 +1,138 @@
+package com.zuehlke.securesoftwaredevelopment.controller;
+
+import com.zuehlke.securesoftwaredevelopment.service.HotelSnapshotService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.sql.SQLException;
+import java.util.List;
+
+@Controller
+@RequestMapping("/hotels/{hotelId}/snapshots")
+public class HotelSnapshotController {
+    private static final Logger LOG = LoggerFactory.getLogger(HotelSnapshotController.class);
+
+    private final HotelSnapshotService snapshotService;
+
+    public HotelSnapshotController(HotelSnapshotService snapshotService) {
+        this.snapshotService = snapshotService;
+    }
+
+    @PostMapping
+    public String createSnapshot(@PathVariable int hotelId,
+                                 RedirectAttributes redirectAttributes) {
+        try {
+            snapshotService.createSnapshot(hotelId);
+            redirectAttributes.addFlashAttribute("snapshotSuccess", "Snapshot created successfully.");
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            LOG.warn("Snapshot creation interrupted for hotel {}", hotelId, e);
+            redirectAttributes.addFlashAttribute("snapshotError", "Could not create snapshot. Please try again.");
+        } catch (IOException | SQLException | RuntimeException e) {
+            LOG.error("Could not create snapshot for hotel {}", hotelId, e);
+            redirectAttributes.addFlashAttribute("snapshotError", "Could not create snapshot. Please try again.");
+        }
+        return redirectToHotel(hotelId);
+    }
+
+    @PostMapping("/{snapshotId}/rollback")
+    public String rollbackSnapshot(@PathVariable int hotelId,
+                                   @PathVariable long snapshotId,
+                                   RedirectAttributes redirectAttributes) {
+        try {
+            if (snapshotService.rollbackToSnapshot(hotelId, snapshotId) == null) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+            }
+            redirectAttributes.addFlashAttribute("snapshotSuccess", "Snapshot restored successfully.");
+        } catch (ResponseStatusException e) {
+            throw e;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            LOG.warn("Snapshot rollback interrupted for hotel {}, snapshot {}", hotelId, snapshotId, e);
+            redirectAttributes.addFlashAttribute(
+                    "snapshotError",
+                    "Could not restore snapshot. The current hotel state was not changed."
+            );
+        } catch (IOException | SQLException | RuntimeException e) {
+            LOG.error("Could not restore snapshot {} for hotel {}", snapshotId, hotelId, e);
+            redirectAttributes.addFlashAttribute(
+                    "snapshotError",
+                    "Could not restore snapshot. The current hotel state was not changed."
+            );
+        }
+        return redirectToHotel(hotelId);
+    }
+
+    @GetMapping("/{snapshotId}/download")
+    @ResponseBody
+    public ResponseEntity<Resource> downloadSnapshot(@PathVariable int hotelId,
+                                                     @PathVariable long snapshotId) throws IOException {
+        Path archive = snapshotService.findSnapshotArchive(hotelId, snapshotId);
+        if (archive == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        Resource resource = new FileSystemResource(archive.toFile());
+        String disposition = ContentDisposition.builder("attachment")
+                .filename(archive.getFileName().toString())
+                .build()
+                .toString();
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, disposition)
+                .contentType(MediaType.parseMediaType("application/gzip"))
+                .contentLength(Files.size(archive))
+                .body(resource);
+    }
+
+    @PostMapping("/{snapshotId}/selection")
+    @ResponseBody
+    public ResponseEntity<byte[]> downloadSelectedSnapshot(@PathVariable int hotelId,
+                                                           @PathVariable long snapshotId,
+                                                           @RequestParam(name = "files", required = false) List<String> files)
+            throws IOException, InterruptedException {
+        try {
+            byte[] archive = snapshotService.createSelectiveArchive(hotelId, snapshotId, files);
+            if (archive == null) {
+                return ResponseEntity.notFound().build();
+            }
+
+            String fileName = "hotel-" + hotelId + "-snapshot-" + snapshotId + "-selected.tar.gz";
+            String disposition = ContentDisposition.builder("attachment")
+                    .filename(fileName)
+                    .build()
+                    .toString();
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, disposition)
+                    .contentType(MediaType.parseMediaType("application/gzip"))
+                    .contentLength(archive.length)
+                    .body(archive);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    private String redirectToHotel(int hotelId) {
+        return "redirect:/hotels?id=" + hotelId;
+    }
+}
