@@ -172,12 +172,10 @@ public class HotelSnapshotService {
         List<String> command = new ArrayList<>(Arrays.asList(
                 "tar",
                 "-xzf",
-                archive.toString(),
-                "-C",
-                directory.toString()
+                archive.toString()
         ));
         command.addAll(files);
-        runCommand(command, "Could not extract snapshot archive");
+        runCommand(command, "Could not extract snapshot archive", directory);
     }
 
     private void createArchive(Path directory,
@@ -192,14 +190,19 @@ public class HotelSnapshotService {
                 "--"
         ));
         command.addAll(files);
-        runCommand(command, "Could not create snapshot archive");
+        runCommand(command, "Could not create snapshot archive", null);
     }
 
-    private void runCommand(List<String> command, String errorMessage) throws IOException, InterruptedException {
-        Process process = new ProcessBuilder(command)
-                .redirectErrorStream(true)
-                .start();
+    private void runCommand(List<String> command,
+                            String errorMessage,
+                            Path workingDirectory) throws IOException, InterruptedException {
+        ProcessBuilder processBuilder = new ProcessBuilder(command)
+                .redirectErrorStream(true);
+        if (workingDirectory != null) {
+            processBuilder.directory(workingDirectory.toFile());
+        }
 
+        Process process = processBuilder.start();
         String output;
         try (BufferedReader reader = new BufferedReader(
                 new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
