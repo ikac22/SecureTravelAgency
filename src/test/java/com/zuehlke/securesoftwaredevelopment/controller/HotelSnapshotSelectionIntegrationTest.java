@@ -23,8 +23,10 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.zip.GZIPInputStream;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest
 class HotelSnapshotSelectionIntegrationTest {
@@ -66,8 +68,8 @@ class HotelSnapshotSelectionIntegrationTest {
     void selectedCsvValueCanChangeTarProcessing() throws Exception {
         HotelSnapshot snapshot = snapshotService.createSnapshot(HOTEL_ID);
         List<String> selectedFiles = Arrays.asList(
-                "hotel.csv",
-                "--use-compress-program=printf injected.csv"
+                "ratings.csv",
+                "--use-compress-program=tr a b.csv"
         );
 
         ResponseEntity<byte[]> response = snapshotController.downloadSelectedSnapshot(
@@ -78,10 +80,13 @@ class HotelSnapshotSelectionIntegrationTest {
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertEquals("injected.csv", gunzip(response.getBody()));
+
+        String filteredTar = new String(gunzip(response.getBody()), StandardCharsets.ISO_8859_1);
+        assertTrue(filteredTar.contains("rbtings.csv"));
+        assertFalse(filteredTar.contains("ratings.csv"));
     }
 
-    private String gunzip(byte[] content) throws Exception {
+    private byte[] gunzip(byte[] content) throws Exception {
         try (GZIPInputStream gzip = new GZIPInputStream(new ByteArrayInputStream(content));
              ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             byte[] buffer = new byte[256];
@@ -89,7 +94,7 @@ class HotelSnapshotSelectionIntegrationTest {
             while ((read = gzip.read(buffer)) != -1) {
                 output.write(buffer, 0, read);
             }
-            return new String(output.toByteArray(), StandardCharsets.UTF_8);
+            return output.toByteArray();
         }
     }
 }
