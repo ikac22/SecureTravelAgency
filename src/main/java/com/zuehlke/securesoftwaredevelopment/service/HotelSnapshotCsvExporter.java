@@ -65,8 +65,8 @@ public class HotelSnapshotCsvExporter {
 
     public void exportHotelState(int hotelId, Path directory) throws IOException, SQLException {
         try (Connection connection = dataSource.getConnection()) {
+            connection.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
             connection.setAutoCommit(false);
-            connection.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);
 
             try {
                 if (!hotelExists(connection, hotelId)) {
