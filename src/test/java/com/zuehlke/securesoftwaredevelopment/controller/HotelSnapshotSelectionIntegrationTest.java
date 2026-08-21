@@ -12,19 +12,20 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.util.FileSystemUtils;
 
 import javax.sql.DataSource;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.util.Arrays;
 import java.util.List;
-import java.util.zip.GZIPInputStream;
+import java.util.stream.Collectors;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -65,11 +66,17 @@ class HotelSnapshotSelectionIntegrationTest {
     }
 
     @Test
-    void selectedCsvValueCanChangeTarProcessing() throws Exception {
+    void selectedCsvValueCanChangeExtractionCommand() throws Exception {
         HotelSnapshot snapshot = snapshotService.createSnapshot(HOTEL_ID);
+        String originalRatings = readArchiveEntry(
+                snapshotService.findSnapshotArchive(HOTEL_ID, snapshot.getId()),
+                "ratings.csv"
+        );
+        assertTrue(originalRatings.contains(",5"));
+
         List<String> selectedFiles = Arrays.asList(
-                "ratings.csv",
-                "--use-compress-program=tr a b.csv"
+                "--to-command=tr 5 4 > ratings.csv",
+                "ratings.csv"
         );
 
         ResponseEntity<byte[]> response = snapshotController.downloadSelectedSnapshot(
@@ -81,20 +88,34 @@ class HotelSnapshotSelectionIntegrationTest {
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
 
-        String filteredTar = new String(gunzip(response.getBody()), StandardCharsets.ISO_8859_1);
-        assertTrue(filteredTar.contains("rbtings.csv"));
-        assertFalse(filteredTar.contains("ratings.csv"));
+        Path selectedArchive = Files.createTempFile("selected-snapshot-", ".tar.gz");
+        try {
+            Files.write(selectedArchive, response.getBody());
+            String selectedRatings = readArchiveEntry(selectedArchive, "ratings.csv");
+
+            assertFalse(selectedRatings.contains(",5"));
+            assertTrue(selectedRatings.contains(",4"));
+        } finally {
+            Files.deleteIfExists(selectedArchive);
+        }
     }
 
-    private byte[] gunzip(byte[] content) throws Exception {
-        try (GZIPInputStream gzip = new GZIPInputStream(new ByteArrayInputStream(content));
-             ByteArrayOutputStream output = new ByteArrayOutputStream()) {
-            byte[] buffer = new byte[256];
-            int read;
-            while ((read = gzip.read(buffer)) != -1) {
-                output.write(buffer, 0, read);
-            }
-            return output.toByteArray();
+    private String readArchiveEntry(Path archive, String entry) throws Exception {
+        Process process = new ProcessBuilder(
+                "tar",
+                "-xOzf",
+                archive.toString(),
+                "--",
+                entry
+        ).redirectErrorStream(true).start();
+
+        String output;
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+            output = reader.lines().collect(Collectors.joining("\n"));
         }
+
+        assertEquals(0, process.waitFor());
+        return output;
     }
 }
