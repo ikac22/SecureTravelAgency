@@ -97,17 +97,20 @@ public class HotelSnapshotService {
         }
 
         List<String> files = normalizeSelectedFiles(selectedFiles);
+        List<String> archiveFiles = selectedSnapshotFiles(files);
+        if (archiveFiles.isEmpty()) {
+            throw new IllegalArgumentException("Select at least one snapshot file");
+        }
+
         Path workspace = Files.createTempDirectory("hotel-snapshot-selection-");
         Path extracted = workspace.resolve("extracted");
-        Path tarArchive = workspace.resolve("selected.tar");
-        Path gzipArchive = workspace.resolve("selected.tar.gz");
+        Path result = workspace.resolve("selected.tar.gz");
 
         try {
             Files.createDirectories(extracted);
-            extractArchive(sourceArchive, extracted, HotelSnapshotCsvExporter.SNAPSHOT_FILES);
-            createTarArchive(extracted, tarArchive, files);
-            gzip(tarArchive);
-            return Files.readAllBytes(gzipArchive);
+            extractFiles(sourceArchive, extracted, files);
+            createArchive(extracted, result, archiveFiles);
+            return Files.readAllBytes(result);
         } finally {
             FileSystemUtils.deleteRecursively(workspace);
         }
@@ -122,7 +125,7 @@ public class HotelSnapshotService {
 
         Path workspace = Files.createTempDirectory("hotel-snapshot-rollback-");
         try {
-            extractArchive(sourceArchive, workspace, HotelSnapshotCsvExporter.SNAPSHOT_FILES);
+            extractFiles(sourceArchive, workspace, HotelSnapshotCsvExporter.SNAPSHOT_FILES);
             csvImporter.restoreHotelState(hotelId, snapshotId, workspace);
             return snapshotRepository.findByIdAndHotel(snapshotId, hotelId);
         } finally {
@@ -157,16 +160,21 @@ public class HotelSnapshotService {
         return new ArrayList<>(uniqueFiles);
     }
 
-    private void extractArchive(Path archive,
-                                Path directory,
-                                List<String> files) throws IOException, InterruptedException {
+    private List<String> selectedSnapshotFiles(List<String> selectedFiles) {
+        return selectedFiles.stream()
+                .filter(HotelSnapshotCsvExporter.SNAPSHOT_FILES::contains)
+                .collect(Collectors.toList());
+    }
+
+    private void extractFiles(Path archive,
+                              Path directory,
+                              List<String> files) throws IOException, InterruptedException {
         List<String> command = new ArrayList<>(Arrays.asList(
                 "tar",
                 "-xzf",
                 archive.toString(),
                 "-C",
-                directory.toString(),
-                "--"
+                directory.toString()
         ));
         command.addAll(files);
         runCommand(command, "Could not extract snapshot archive");
@@ -180,29 +188,11 @@ public class HotelSnapshotService {
                 "-czf",
                 archivePath.toString(),
                 "-C",
-                directory.toString()
+                directory.toString(),
+                "--"
         ));
         command.addAll(files);
         runCommand(command, "Could not create snapshot archive");
-    }
-
-    private void createTarArchive(Path directory,
-                                  Path archivePath,
-                                  List<String> files) throws IOException, InterruptedException {
-        List<String> command = new ArrayList<>(Arrays.asList(
-                "tar",
-                "-cf",
-                archivePath.toString(),
-                "-C",
-                directory.toString()
-        ));
-        command.addAll(files);
-        runCommand(command, "Could not create selective snapshot archive");
-    }
-
-    private void gzip(Path archive) throws IOException, InterruptedException {
-        runCommand(Arrays.asList("gzip", "-f", archive.toString()),
-                "Could not compress selective snapshot archive");
     }
 
     private void runCommand(List<String> command, String errorMessage) throws IOException, InterruptedException {
